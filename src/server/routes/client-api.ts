@@ -2,8 +2,18 @@ import { Router, Request, Response } from 'express';
 import db, { writeLog } from '../db';
 import { getPublicKeyPem, issueToken, newSecret, hashSecret, verifySignedRequest, generateCodeString } from '../crypto';
 import { rateLimit } from '../middleware';
+import { PUBLIC_BASE_URL } from '../config';
 
 const router = Router();
+
+// --- 0. 公开运行时配置（供后台 SDK 生成器获取对外客户端基址） ---
+router.get('/meta', (_req: Request, res: Response) => {
+  res.json({
+    ok: true,
+    base_url: PUBLIC_BASE_URL,
+    server_time: Math.floor(Date.now() / 1000),
+  });
+});
 
 const CODE_RE = /^(?:[A-Z0-9]{1,8}-)?[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/;
 const MID_RE = /^[a-f0-9_-]{8,128}$/i;

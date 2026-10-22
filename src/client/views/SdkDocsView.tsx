@@ -13,6 +13,18 @@ export const SdkDocsView: React.FC<Props> = ({ products, showToast }) => {
   const [selectedId, setSelectedId] = useState<number>(0);
   const [pubPem, setPubPem] = useState<string>('');
   const [lang, setLang] = useState<Lang>('csharp');
+  const [serverOrigin, setServerOrigin] = useState<string>(window.location.origin);
+
+  useEffect(() => {
+    fetch('/api/meta')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.ok && typeof data.base_url === 'string' && data.base_url) {
+          setServerOrigin(data.base_url.replace(/\/+$/, ''));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (products.length > 0 && !selectedId) {
@@ -31,7 +43,6 @@ export const SdkDocsView: React.FC<Props> = ({ products, showToast }) => {
 
   const currentProd = products.find(p => p.id === selectedId);
   const slug = currentProd?.slug || 'your-product-slug';
-  const serverOrigin = window.location.origin;
 
   const generateCode = (): string => {
     if (lang === 'csharp') {

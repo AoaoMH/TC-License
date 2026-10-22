@@ -34,4 +34,6 @@ loadEnv();
 
 export const PORT = parseInt(process.env.PORT || '3000', 10);
 export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+// 对外分发的客户端 API 基址（用于后台 SDK 代码生成器），留空则使用当前访问域名
+export const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '');
 export const ONLINE_WINDOW_SEC = 180; // 3分钟内有心跳视为在线
