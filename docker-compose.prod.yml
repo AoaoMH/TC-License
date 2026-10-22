@@ -1,0 +1,28 @@
+# 生产服务器精简编排文件 (无需源码与 Node 环境，直接拉取 GitHub 自动构建的镜像)
+# 部署方式：
+#   1. 在服务器创建文件夹 (如 /opt/tc-license)
+#   2. 上传本文件并重命名为 docker-compose.yml
+#   3. 在同目录下创建 .env (设置 ADMIN_PASSWORD=你的强密码)
+#   4. 执行: docker compose up -d
+
+services:
+  tc-license:
+    image: ghcr.io/aoaomh/tc-license:latest
+    container_name: tc-license
+    restart: unless-stopped
+    # 仅绑定宿主机 127.0.0.1，交由 1Panel / 宝塔面板 Nginx 反代暴露 HTTPS
+    ports:
+      - "127.0.0.1:${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - ./data:/app/data
+      - ./keys:/app/keys
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
