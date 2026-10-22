@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { adminFetch } from '../api';
 import { Product } from '../../shared/types';
+import { Badge, Button, PageHeader, Segmented, Select, copyText } from '../components/ui';
+import { Icon } from '../components/Icon';
 
 interface Props {
   products: Product[];
@@ -248,53 +250,135 @@ export function buildSignedBody(secret: string, code: string, machineId: string)
 }`;
   };
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(generateCode()).then(() => showToast('代码已复制到剪贴板'));
+  const code = generateCode();
+
+  const LANG_OPTIONS: Array<{ value: Lang; label: string }> = [
+    { value: 'csharp', label: 'C# / Unity' },
+    { value: 'python', label: 'Python' },
+    { value: 'nodejs', label: 'Node.js / TS' },
+  ];
+
+  const productOptions = products.map(p => ({ value: String(p.id), label: p.name, hint: p.slug }));
+
+  const applyCopy = async () => {
+    const ok = await copyText(code);
+    showToast(ok ? '完整代码已复制到剪贴板' : '复制失败，请手动选择代码', !ok);
   };
+
+  const endpoints = [
+    {
+      path: '/api/init',
+      method: 'GET',
+      params: '?product={slug}&version=1.0.0',
+      desc: '返回项目状态、公告、是否需强制更新、免费试用配置与 Ed25519 公钥。',
+    },
+    {
+      path: '/api/activate',
+      method: 'POST',
+      params: '{ product, code, machine_id, device_name }',
+      desc: '首次激活开始倒计时；校验设备并发席位；下发 token、secret 与私有 custom_data。',
+    },
+    {
+      path: '/api/trial',
+      method: 'POST',
+      params: '{ product, machine_id, device_name }',
+      desc: '每台机器限领一次免费试用卡，返回与激活接口完全相同的凭证结构。',
+    },
+    {
+      path: '/api/verify',
+      method: 'POST',
+      params: '{ product, code, machine_id, ts, nonce, sig }',
+      desc: 'HMAC-SHA256 验签 + 防重放；返回最新有效期 token 与最新私有 custom_data。',
+    },
+    {
+      path: '/api/heartbeat',
+      method: 'POST',
+      params: '{ product, code, machine_id, ts, nonce, sig }',
+      desc: '返回 status: active | kick | revoked | expired | maintenance | banned。',
+    },
+    {
+      path: '/api/unbind',
+      method: 'POST',
+      params: '{ product, code, machine_id? }',
+      desc: '客户端自助换绑：按产品策略校验冷却时间、次数上限，并自动扣除换绑惩罚时长。',
+    },
+  ];
 
   return (
     <div>
-      <div className="topbar">
-        <div>
-          <h1>API 协议规范与客户端代码生成器</h1>
-          <div className="sub">选择目标产品，一键生成已自动嵌入该产品 Slug 与 Ed25519 公钥的客户端验证代码</div>
-        </div>
-      </div>
+      <PageHeader
+        icon="book"
+        title="对接文档与 SDK"
+        subtitle="选择目标产品，即可生成已自动嵌入产品 Slug 与 Ed25519 公钥的客户端验证代码，覆盖激活、签名校验、心跳与换绑。"
+      />
 
-      <div className="panel">
+      <section className="panel">
         <div className="panel-head">
-          <h2>交互式 SDK 代码生成器</h2>
-          <div className="row">
-            <label className="row" style={{ gap: 6 }}>
-              <span className="muted">选择产品</span>
-              <select value={selectedId} onChange={e => setSelectedId(Number(e.target.value))}>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.slug})</option>
-                ))}
-              </select>
-            </label>
-            <button className={`btn sm ${lang === 'csharp' ? 'primary' : ''}`} onClick={() => setLang('csharp')}>
-              C# / Unity / Mod
-            </button>
-            <button className={`btn sm ${lang === 'python' ? 'primary' : ''}`} onClick={() => setLang('python')}>
-              Python
-            </button>
-            <button className={`btn sm ${lang === 'nodejs' ? 'primary' : ''}`} onClick={() => setLang('nodejs')}>
-              Node.js / TS
-            </button>
-            <button className="btn sm" onClick={copyCode}>复制完整代码</button>
+          <div className="panel-head-icon">
+            <Icon name="book" size={15} />
+          </div>
+          <div>
+            <h3>交互式代码生成器</h3>
+            <div className="panel-head-sub">代码在浏览器本地生成，不会上传任何密钥</div>
+          </div>
+          <div className="spacer" />
+          <Badge tone="info" dot>
+            已嵌入 {slug}
+          </Badge>
+        </div>
+
+        <div className="panel-body">
+          <div className="sdk-toolbar">
+            <div className="sdk-field">
+              <span className="sdk-label">目标产品</span>
+              <Select
+                value={selectedId ? String(selectedId) : ''}
+                onChange={v => setSelectedId(Number(v))}
+                options={productOptions}
+                placeholder={products.length ? '选择产品' : '暂无产品'}
+                minWidth={230}
+                searchable={products.length > 6}
+              />
+            </div>
+            <Segmented value={lang} onChange={setLang} options={LANG_OPTIONS} />
+            <div className="spacer" />
+            <Button variant="primary" icon="copy" onClick={applyCopy}>
+              复制完整代码
+            </Button>
+          </div>
+
+          <div className="code-shell">
+            <div className="code-head">
+              <span className="code-dots">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span className="code-title">
+                {lang === 'csharp' ? 'LicenseClient.cs' : lang === 'python' ? 'license_client.py' : 'licenseClient.ts'}
+              </span>
+              <div className="spacer" />
+              <Button size="sm" variant="ghost" icon="copy" onClick={applyCopy}>
+                复制
+              </Button>
+            </div>
+            <pre className="code-box">{code}</pre>
           </div>
         </div>
-        <pre className="code-box" style={{ maxHeight: 480, padding: 16, background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'auto', fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12.5 }}>
-          {generateCode()}
-        </pre>
-      </div>
+      </section>
 
-      <div className="panel">
+      <section className="panel">
         <div className="panel-head">
-          <h2>标准接口速查表</h2>
+          <div className="panel-head-icon">
+            <Icon name="list" size={15} />
+          </div>
+          <div>
+            <h3>标准接口速查</h3>
+            <div className="panel-head-sub">所有接口均返回 JSON，错误时 ok=false 并附带 error 文案</div>
+          </div>
         </div>
-        <div className="tablewrap">
+
+        <div className="table-wrap">
           <table>
             <thead>
               <tr>
@@ -305,46 +389,24 @@ export function buildSignedBody(secret: string, code: string, machineId: string)
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td><code>/api/init</code></td>
-                <td>GET</td>
-                <td><code>?product={slug}&amp;version=1.0.0</code></td>
-                <td>返回项目状态、公告、是否需强更 (<code>update_required</code>)、免费试用配置与公钥</td>
-              </tr>
-              <tr>
-                <td><code>/api/activate</code></td>
-                <td>POST</td>
-                <td><code>{`{ product, code, machine_id, device_name }`}</code></td>
-                <td>首次激活触发倒计时；检查设备并发席位；下发 <code>token</code>、<code>secret</code> 与私有 <code>custom_data</code></td>
-              </tr>
-              <tr>
-                <td><code>/api/trial</code></td>
-                <td>POST</td>
-                <td><code>{`{ product, machine_id, device_name }`}</code></td>
-                <td>每台机器限领一次免费试用卡，返回与 <code>/api/activate</code> 完全相同的凭证结构</td>
-              </tr>
-              <tr>
-                <td><code>/api/verify</code></td>
-                <td>POST</td>
-                <td><code>{`{ product, code, machine_id, ts, nonce, sig }`}</code></td>
-                <td>HMAC-SHA256 验签 + 防重放；返回最新有效期 <code>token</code> 与最新私有 <code>custom_data</code></td>
-              </tr>
-              <tr>
-                <td><code>/api/heartbeat</code></td>
-                <td>POST</td>
-                <td><code>{`{ product, code, machine_id, ts, nonce, sig }`}</code></td>
-                <td>返回 <code>status: active | kick | revoked | expired | maintenance | banned</code></td>
-              </tr>
-              <tr>
-                <td><code>/api/unbind</code></td>
-                <td>POST</td>
-                <td><code>{`{ product, code, machine_id? }`}</code></td>
-                <td>客户端自助换绑：按产品策略校验冷却时间、次数上限并自动扣除换绑惩罚时长</td>
-              </tr>
+              {endpoints.map(ep => (
+                <tr key={ep.path}>
+                  <td>
+                    <span className="mono endpoint">{ep.path}</span>
+                  </td>
+                  <td>
+                    <Badge tone={ep.method === 'GET' ? 'info' : 'accent'}>{ep.method}</Badge>
+                  </td>
+                  <td>
+                    <span className="mono param">{ep.params}</span>
+                  </td>
+                  <td className="text-2">{ep.desc}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
